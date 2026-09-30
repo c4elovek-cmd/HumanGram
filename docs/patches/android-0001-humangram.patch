@@ -1,0 +1,93 @@
+diff --git a/TMessagesProj/build.gradle b/TMessagesProj/build.gradle
+index 85a9f84..eb70ece 100644
+--- a/TMessagesProj/build.gradle
++++ b/TMessagesProj/build.gradle
+@@ -143,6 +143,21 @@ android {
+         minSdkVersion 21
+         targetSdkVersion 36
+ 
++        // HumanGram: библиотека HumanGram-Proxy собирается под выбранные
++        // архитектуры. Список задаётся свойством humanGramAbis через -P;
++        // по умолчанию только arm64-v8a, чтобы не тратить время на сборку.
++        // Для универсального APK передаётся
++        // -P humanGramAbis=armeabi-v7a,arm64-v8a,x86,x86_64
++        if (project.hasProperty('humanGramAbis')) {
++            ndk {
++                abiFilters project.humanGramAbis.split(',').collect { it.trim() }
++            }
++        } else {
++            ndk {
++                abiFilters 'arm64-v8a'
++            }
++        }
++
+         vectorDrawables.generatedDensities = ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi']
+ 
+         multiDexEnabled true
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/ApplicationLoader.java b/TMessagesProj/src/main/java/org/telegram/messenger/ApplicationLoader.java
+index 5405be7..8cce1c6 100644
+--- a/TMessagesProj/src/main/java/org/telegram/messenger/ApplicationLoader.java
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/ApplicationLoader.java
+@@ -323,6 +323,21 @@ public class ApplicationLoader extends Application {
+             applicationContext = getApplicationContext();
+         }
+ 
++        // HumanGram: поднимаем встроенный локальный прокси MTProto
++        // до установки сетевых соединений, чтобы адрес прокси был известен
++        // к моменту инициализации ConnectionsManager. Если библиотека
++        // недоступна, приложение продолжает работу с прямыми подключениями.
++        try {
++            final HumanGramProxy humanGramProxy = HumanGramProxy.start(applicationContext);
++            if (humanGramProxy != null && BuildVars.LOGS_ENABLED) {
++                FileLog.d("HumanGram: proxy at " + humanGramProxy.getAddress());
++            }
++        } catch (Throwable e) {
++            if (BuildVars.LOGS_ENABLED) {
++                FileLog.e(e);
++            }
++        }
++
+         NativeLoader.initNativeLibs(ApplicationLoader.applicationContext);
+ 
+         try {
+diff --git a/TMessagesProj/src/main/java/org/telegram/tgnet/ConnectionsManager.java b/TMessagesProj/src/main/java/org/telegram/tgnet/ConnectionsManager.java
+index c3a70ed..f356ed3 100644
+--- a/TMessagesProj/src/main/java/org/telegram/tgnet/ConnectionsManager.java
++++ b/TMessagesProj/src/main/java/org/telegram/tgnet/ConnectionsManager.java
+@@ -42,6 +42,7 @@ import org.telegram.messenger.MessagesController;
+ import org.telegram.messenger.NotificationCenter;
+ import org.telegram.messenger.PushListenerController;
+ import org.telegram.messenger.SharedConfig;
++import org.telegram.messenger.HumanGramProxy;
+ import org.telegram.messenger.StatsController;
+ import org.telegram.messenger.UserConfig;
+ import org.telegram.messenger.Utilities;
+@@ -633,7 +634,15 @@ public class ConnectionsManager extends BaseController {
+     public void init(int version, int layer, int apiId, String deviceModel, String systemVersion, String appVersion, String langCode, String systemLangCode, String configPath, String logPath, String regId, String cFingerprint, int timezoneOffset, long userId, boolean userPremium, boolean enablePushConnection) {
+         final SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
+         final ProxySettings proxySettings = ProxySettings.fromSharedPreferences(preferences);
+-        if (preferences.getBoolean("proxy_enabled", false) && proxySettings.isValid()) {
++        // HumanGram: встроенный прокси имеет приоритет над пользовательскими
++        // настройками, поскольку клиент настроен на него автоматически при
++        // старте приложения. Если прокси недоступен, сохраняется прежнее
++        // поведение: прямые подключения либо прокси из настроек.
++        final HumanGramProxy humanGramProxy = HumanGramProxy.getInstance();
++        if (humanGramProxy != null && humanGramProxy.getPort() > 0) {
++            native_setProxySettings(currentAccount, "127.0.0.1", humanGramProxy.getPort(), "", "",
++                    HumanGramProxy.getSecret(ApplicationLoader.applicationContext));
++        } else if (preferences.getBoolean("proxy_enabled", false) && proxySettings.isValid()) {
+             if (proxySettings.getType() == ProxySettings.Type.WEB) {
+                 int localPort = WebProxyTransport.start(proxySettings.getAddress(), proxySettings.getSecret());
+                 native_setProxySettings(currentAccount, "127.0.0.1", localPort != 0 ? localPort : 9, "", "",
+diff --git a/TMessagesProj/src/main/res/values/strings.xml b/TMessagesProj/src/main/res/values/strings.xml
+index 1013bb6..17fd21e 100644
+--- a/TMessagesProj/src/main/res/values/strings.xml
++++ b/TMessagesProj/src/main/res/values/strings.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="AppName">Telegram</string>
++    <string name="AppName">HumanGram</string>
+     <string name="AppNameBeta">Telegram Beta</string>
+     <string name="LanguageName">English</string>
+     <string name="English">English</string>

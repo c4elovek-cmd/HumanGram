@@ -1,0 +1,73 @@
+MIT License
+
+Copyright (c) 2026 HumanGram contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+================================================================================
+ОБЛАСТЬ ПРИМЕНЕНИЯ ЛИЦЕНЗИИ
+================================================================================
+
+Настоящая лицензия MIT распространяется ТОЛЬКО на оригинальные материалы
+проекта HumanGram:
+
+  * proxy/          модуль HumanGram-Proxy (исходный код на Go и обвязка);
+  * build/          скрипты сборки и установки;
+  * README.md       документация;
+  * .gitignore и прочие служебные файлы репозитория.
+
+Лицензия MIT НЕ распространяется на код сторонних проектов, включённый в
+репозиторий в качестве исходников клиентов:
+
+  * desktop/        Telegram Desktop, лицензия GPL-3.0-or-later
+                    (см. desktop/LICENSE, файл Telegram Desktop);
+  * android/        Telegram Android (TMPro), лицензия GPL-2.0
+                    (см. android/LICENSE, файл COPYING);
+
+  * proxy/LICENSE   содержит MIT с разделом Credits, описывающим
+                    происхождение используемых протокольных решений.
+
+Лицензии GPL на клиентов сохраняются в полном объёме. Модифицированные версии
+Telegram Desktop и Telegram Android распространяются на условиях GPL и должны
+сопровождаться предоставлением соответствующего исходного кода, что и
+выполняется: настоящий репозиторий содержит полные исходники клиентов.
+
+--------------------------------------------------------------------------------
+Credits / Благодарности
+--------------------------------------------------------------------------------
+
+Telegram — команда разработчиков Telegram Messenger и авторы протокола
+MTProto и его спецификации (https://core.telegram.org/mtproto).
+  * Telegram Desktop — https://github.com/telegramdesktop/tdesktop (GPL-3.0-or-later)
+  * Telegram Android  — https://github.com/DrKLO/Telegram (GPL-2.0)
+
+Flowseal — автор проекта tg-ws-proxy (https://github.com/Flowseal/tg-ws-proxy),
+лицензия MIT (Copyright (c) 2026 Flowseal). Идея локального прокси,
+переносящего трафик MTProto в WebSocket, и поведение протокола заимствованы
+из этого проекта. Использован как источник сведений о протоколе; настоящий
+модуль написан заново на Go.
+
+Форки Telegram, повлиявшие на выбор точек интеграции, но не включённые в
+состав настоящего репозитория:
+  * AyuGram Desktop — https://github.com/AyuGram/tdesktop (GPL-3.0-or-later)
+  * Nekogram       — https://github.com/Nekogram/Nekogram (GPL-3.0-or-later)
+  * tg-ws-proxy    — https://github.com/Flowseal/tg-ws-proxy (MIT)
+
+Сообщество Go — стандартная библиотека языка Go, на которой реализован
+модуль HumanGram-Proxy.

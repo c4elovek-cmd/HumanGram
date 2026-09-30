@@ -1,0 +1,341 @@
+diff --git a/TMessagesProj/src/main/java/org/telegram/messenger/HumanGramProxy.java b/TMessagesProj/src/main/java/org/telegram/messenger/HumanGramProxy.java
+new file mode 100644
+index 0000000..2263e22
+--- /dev/null
++++ b/TMessagesProj/src/main/java/org/telegram/messenger/HumanGramProxy.java
+@@ -0,0 +1,284 @@
++/*
++ * HumanGram — встроенный локальный прокси MTProto-over-WebSocket.
++ *
++ * Класс HumanGramProxy загружает нативную библиотеку HumanGram-Proxy
++ * (libhumangramproxy.so) и поднимает локальный прокси на 127.0.0.1
++ * со свободным портом. Клиент Telegram затем использует этот адрес
++ * как адрес прокси MTProto.
++ *
++ * Модуль написан на Go и распространяется по лицензии MIT.
++ * Copyright (c) 2026 HumanGram contributors
++ *
++ * Credits:
++ *   - Flowseal, проект tg-ws-proxy (https://github.com/Flowseal/tg-ws-proxy,
++ *     MIT) — источник сведений о протоколе локального прокси MTProto,
++ *     переносящего трафик в WebSocket.
++ *   - Разработчики Telegram (https://core.telegram.org/mtproto) — протокол
++ *     MTProto.
++ *
++ * Полный текст Credits приведён в файле LICENSE репозитория HumanGram.
++ *
++ * Этот файл — часть HumanGram Android, производного от Telegram Android,
++ * который распространяется по лицензии GPL-2.0.
++ */
++
++package org.telegram.messenger;
++
++import android.content.Context;
++import android.content.SharedPreferences;
++import android.util.Log;
++
++import java.nio.charset.StandardCharsets;
++
++/**
++ * Обвязка нативного модуля HumanGram-Proxy для Android.
++ *
++ * Жизненный цикл совпадает с жизненным циклом процесса: прокси
++ * поднимается при старте приложения и остаётся доступен всем
++ * подключениям MTProto.
++ *
++ * Экземпляр создаётся в {@code ApplicationLoader} до установки
++ * соединений, чтобы адрес прокси был известен при инициализации.
++ */
++public class HumanGramProxy {
++
++    private static final String TAG = "HumanGramProxy";
++
++    /** Имя нативной библиотеки без префикса и расширения. */
++    private static final String LIBRARY = "humangramproxy";
++
++    /** Имя файла с настройками в private-хранилище приложения. */
++    private static final String PREFS = "humangram_proxy";
++
++    private static final String KEY_SECRET = "secret";
++    private static final String KEY_UPSTREAM = "upstream";
++    private static final String KEY_WS_URL = "websocket_url";
++    private static final String KEY_INSECURE = "insecure_skip_verify";
++    private static final String KEY_ENABLED = "enabled";
++    private static final String KEY_AUTO = "auto_start";
++
++    private static volatile boolean libraryLoaded;
++    private static volatile HumanGramProxy instance;
++
++    private final String address;
++    private final int port;
++
++    private HumanGramProxy(String address, int port) {
++        this.address = address;
++        this.port = port;
++    }
++
++    /**
++     * @return адрес прокси в формате "127.0.0.1:PORT" либо {@code null},
++     *         если прокси не удалось запустить.
++     */
++    public String getAddress() {
++        return address;
++    }
++
++    public int getPort() {
++        return port;
++    }
++
++    /**
++     * @return запущенный прокси либо {@code null}. Вызывается нативным
++     *         слоем при инициализации соединений.
++     */
++    public static HumanGramProxy getInstance() {
++        return instance;
++    }
++
++    /** Подключён ли клиент к прокси: 1 — да, 0 — нет. */
++    public native int nativeSessions();
++
++    private static native int nativeStart(String configJson);
++    private static native String nativeAddress();
++    private static native String nativeLastError();
++    private static native void nativeFreeString(String value);
++    private static native int nativeStop();
++    private static native int nativeIsRunning();
++    private static native String nativeVersion();
++
++    /**
++     * Загружает нативную библиотеку. Вызывается однократно.
++     *
++     * @return true, если библиотека доступна.
++     */
++    private static synchronized boolean loadLibrary() {
++        if (libraryLoaded) {
++            return true;
++        }
++        try {
++            System.loadLibrary(LIBRARY);
++            libraryLoaded = true;
++            Log.i(TAG, "HumanGram-Proxy " + nativeVersion() + " загружен");
++        } catch (UnsatisfiedLinkError e) {
++            // Отсутствие библиотеки не должно ломать приложение: клиент
++            // продолжит работать с прямыми подключениями.
++            Log.w(TAG, "Библиотека HumanGram-Proxy недоступна: " + e.getMessage());
++            libraryLoaded = false;
++        }
++        return libraryLoaded;
++    }
++
++    /**
++     * Поднимает прокси с настройками по умолчанию либо из хранилища.
++     *
++     * @param context контекст приложения для доступа к настройкам.
++     * @return экземпляр прокси либо {@code null}, если запуск не удался.
++     */
++    public static synchronized HumanGramProxy start(Context context) {
++        if (instance != null) {
++            return instance;
++        }
++        if (!loadLibrary()) {
++            return null;
++        }
++        if (nativeIsRunning() != 0) {
++            // Прокси уже поднят, например после перезапуска процесса.
++            instance = new HumanGramProxy(nonEmpty(nativeAddress()), 0);
++            return instance;
++        }
++
++        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
++        if (!prefs.getBoolean(KEY_AUTO, true)) {
++            Log.i(TAG, "Автозапуск прокси отключён настройками");
++            return null;
++        }
++
++        String config = buildConfig(prefs);
++        int rc = nativeStart(config);
++        if (rc != 0) {
++            Log.e(TAG, "Не удалось запустить прокси (код " + rc + "): " + nativeLastError());
++            return null;
++        }
++        String addr = nonEmpty(nativeAddress());
++        int port = 0;
++        int colon = addr.lastIndexOf(':');
++        if (colon > 0) {
++            try {
++                port = Integer.parseInt(addr.substring(colon + 1));
++            } catch (NumberFormatException ignored) {
++                port = 0;
++            }
++        }
++        instance = new HumanGramProxy(addr, port);
++        Log.i(TAG, "Прокси слушает " + addr);
++        return instance;
++    }
++
++    /** Останавливает прокси и освобождает ресурсы. */
++    public static synchronized void stop() {
++        if (libraryLoaded && nativeIsRunning() != 0) {
++            nativeStop();
++            Log.i(TAG, "Прокси остановлен");
++        }
++        instance = null;
++    }
++
++    /** @return версия модуля либо пустая строка, если библиотека не загружена. */
++    public static String version() {
++        if (!loadLibrary()) {
++            return "";
++        }
++        String v = nativeVersion();
++        nativeFreeString(v);
++        return v == null ? "" : v;
++    }
++
++    private static String nonEmpty(String s) {
++        return s == null ? "" : s;
++    }
++
++    /**
++     * Формирует конфигурацию модуля в JSON.
++     *
++     * Настройки хранятся в приватном хранилище приложения и не попадают
++     * в исходный код: пользователь задаёт их при первом запуске.
++     */
++    private static String buildConfig(SharedPreferences prefs) {
++        StringBuilder sb = new StringBuilder(256);
++        sb.append('{');
++        sb.append("\"secret\":\"").append(escape(prefs.getString(KEY_SECRET, ""))).append("\",");
++        sb.append("\"host\":\"127.0.0.1\",");
++        sb.append("\"port\":0,");
++        sb.append("\"upstream\":\"").append(escape(prefs.getString(KEY_UPSTREAM, "direct"))).append("\",");
++        sb.append("\"websocketUrl\":\"").append(escape(prefs.getString(KEY_WS_URL, ""))).append("\",");
++        sb.append("\"insecureSkipVerify\":")
++                .append(prefs.getBoolean(KEY_INSECURE, false) ? "true" : "false").append(',');
++        sb.append("\"handshakeTimeoutMs\":15000,");
++        sb.append("\"debug\":false");
++        sb.append('}');
++        return sb.toString();
++    }
++
++    private static String escape(String s) {
++        if (s == null) {
++            return "";
++        }
++        StringBuilder sb = new StringBuilder(s.length() + 8);
++        for (int i = 0; i < s.length(); i++) {
++            char c = s.charAt(i);
++            switch (c) {
++                case '"':
++                    sb.append("\\\"");
++                    break;
++                case '\\':
++                    sb.append("\\\\");
++                    break;
++                case '\n':
++                    sb.append("\\n");
++                    break;
++                case '\r':
++                    sb.append("\\r");
++                    break;
++                case '\t':
++                    sb.append("\\t");
++                    break;
++                default:
++                    if (c < 0x20) {
++                        sb.append(String.format("\\u%04x", (int) c));
++                    } else {
++                        sb.append(c);
++                    }
++            }
++        }
++        return sb.toString();
++    }
++
++    /** Секрет прокси, заданный пользователем, либо пустая строка. */
++    public static String getSecret(Context context) {
++        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++                .getString(KEY_SECRET, "");
++    }
++
++    /** Сохраняет секрет прокси. */
++    public static void setSecret(Context context, String secret) {
++        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++                .edit().putString(KEY_SECRET, secret == null ? "" : secret.trim()).apply();
++    }
++
++    /** Сохраняет адрес WebSocket-эндпоинта. */
++    public static void setWebSocketUrl(Context context, String url) {
++        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++                .edit().putString(KEY_WS_URL, url == null ? "" : url.trim()).apply();
++    }
++
++    /** Выбирает режим восходящего транспорта: "direct" или "websocket". */
++    public static void setUpstream(Context context, String upstream) {
++        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++                .edit().putString(KEY_UPSTREAM, upstream == null ? "direct" : upstream).apply();
++    }
++
++    /** Включает или выключает автозапуск прокси. */
++    public static void setEnabled(Context context, boolean enabled) {
++        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++                .edit().putBoolean(KEY_AUTO, enabled).apply();
++    }
++
++    /** Разрешает недоверенный сертификат TLS для WebSocket-эндпоинта. */
++    public static void setInsecureSkipVerify(Context context, boolean insecure) {
++        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++                .edit().putBoolean(KEY_INSECURE, insecure).apply();
++    }
++}
+diff --git a/gradlew.bat b/gradlew.bat
+new file mode 100644
+index 0000000..08c6027
+--- /dev/null
++++ b/gradlew.bat
+@@ -0,0 +1,45 @@
++@rem
++@rem Gradle startup script for Windows
++@rem
++@rem В исходном проекте присутствует только вариант gradlew для Unix,
++@rem поэтому Windows-обёртка добавлена для сборки HumanGram.
++@rem
++@if "%DEBUG%"=="" @echo off
++setlocal
++
++set DIRNAME=%~dp0
++if "%DIRNAME%"=="" set DIRNAME=.
++set APP_HOME=%DIRNAME%
++set APP_BASE_NAME=%~n0
++
++set CLASSPATH=%APP_HOME%gradle\wrapper\gradle-wrapper.jar
++
++if defined JAVA_HOME goto findJavaFromJavaHome
++
++set JAVA_EXE=java.exe
++%JAVA_EXE% -version >NUL 2>&1
++if %ERRORLEVEL% equ 0 goto execute
++
++echo ERROR: JAVA_HOME is not set and no 'java' command could be found. 1>&2
++goto fail
++
++:findJavaFromJavaHome
++set JAVA_HOME=%JAVA_HOME:"=%
++set JAVA_EXE=%JAVA_HOME%/bin/java.exe
++
++if exist "%JAVA_EXE%" goto execute
++
++echo ERROR: JAVA_HOME is set to an invalid directory: %JAVA_HOME% 1>&2
++goto fail
++
++:execute
++"%JAVA_EXE%" %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" org.gradle.wrapper.GradleWrapperMain %*
++
++if %ERRORLEVEL% equ 0 goto mainEnd
++
++:fail
++if not "%GRADLE_EXIT_CONSOLE%"=="" exit 1
++exit /b 1
++
++:mainEnd
++endlocal

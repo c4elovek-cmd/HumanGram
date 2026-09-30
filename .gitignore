@@ -1,0 +1,46 @@
+# Подготовленные зависимости клиентов (собираются скриптами prepare)
+Libraries/
+ThirdParty/
+android-sdk/
+
+# Клоны клиентов: восстанавливаются скриптами, правки — в docs/patches
+desktop/
+android/
+
+# Сборочное окружение и кэш
+.cache/
+dist/
+desktop-build/
+android-build/
+build/logs/
+build/out/
+build/*.apk
+build/*.zip
+
+# Артефакты сборки клиентов
+*.apk
+*.aab
+out/
+
+# Бинарные артефакты
+*.dll
+*.so
+*.exe
+*.a
+*.lib
+*.pdb
+*.h
+
+# Ключи подписи и локальная конфигурация
+*.keystore
+*.jks
+keystore.properties
+local.properties
+.gradle/
+
+# Инструменты и редакторы
+.vs/
+.idea/
+*.user
+.DS_Store
+Thumbs.db

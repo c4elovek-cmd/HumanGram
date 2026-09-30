@@ -1,0 +1,84 @@
+diff --git a/Telegram/SourceFiles/core/version.h b/Telegram/SourceFiles/core/version.h
+index 8322970..7b03286 100644
+--- a/Telegram/SourceFiles/core/version.h
++++ b/Telegram/SourceFiles/core/version.h
+@@ -18,10 +18,21 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+ #endif // TDESKTOP_ALLOW_CLOSED_ALPHA
+ 
+ // used in Updater.cpp and Setup.iss for Windows
+-constexpr auto AppId = "{53F49750-6209-4FBF-9CA8-7A333C87D1ED}"_cs;
++
++// HumanGram: идентификатор приложения и имена изменены. Исходные
++// значения Telegram Desktop приведены ниже для сопоставления:
++//
++//   AppId    {53F49750-6209-4FBF-9CA8-7A333C87D1ED}
++//   AppName  "Telegram Desktop"
++//   AppFile  "Telegram"
++//
++// Идентификатор изменён намеренно: обновления должны распространяться
++// только на сборки HumanGram и не затрагивать установленный Telegram,
++// а также наоборот. Подробнее: docs/BUILD-PATCHES.md репозитория HumanGram.
++constexpr auto AppId = "{9A4F1C77-5B2E-4E38-9C6D-71E0F3A28B54}"_cs;
+ constexpr auto AppNameOld = "Telegram Win (Unofficial)"_cs;
+-constexpr auto AppName = "Telegram Desktop"_cs;
+-constexpr auto AppFile = "Telegram"_cs;
++constexpr auto AppName = "HumanGram"_cs;
++constexpr auto AppFile = "HumanGram"_cs;
+ constexpr auto AppVersion = 7002010;
+ constexpr auto AppVersionStr = "7.2.10";
+ constexpr auto AppBetaVersion = true;
+diff --git a/Telegram/build/prepare/prepare.py b/Telegram/build/prepare/prepare.py
+index 707de7f..7d9a9ef 100644
+--- a/Telegram/build/prepare/prepare.py
++++ b/Telegram/build/prepare/prepare.py
+@@ -83,7 +83,9 @@ if not os.path.isdir(os.path.join(thirdPartyDir, keysLoc)):
+     pathlib.Path(os.path.join(thirdPartyDir, keysLoc)).mkdir(parents=True, exist_ok=True)
+ 
+ pathPrefixes = [
++    'ThirdParty\\msys64\\ucrt64\\bin',
+     'ThirdParty\\msys64\\mingw64\\bin',
++    'ThirdParty\\msys64\\usr\\bin',
+     'ThirdParty\\jom',
+     'ThirdParty\\gyp',
+ ] if win else [
+@@ -475,14 +477,15 @@ win:
+     msys64.exe
+     del msys64.exe
+ 
+-    bash -c "pacman-key --init; pacman-key --populate; pacman -Syu --noconfirm"
+-    pacman -Syu --noconfirm ^
++    bash -c "pacman-key --init; pacman-key --populate; pacman -Syyuu --noconfirm"
++    pacman -Syu --noconfirm
++    pacman -S --noconfirm --needed ^
+         make ^
+-        mingw-w64-x86_64-diffutils ^
+-        mingw-w64-x86_64-gperf ^
+-        mingw-w64-x86_64-nasm ^
+-        mingw-w64-x86_64-perl ^
+-        mingw-w64-x86_64-pkgconf
++        perl ^
++        mingw-w64-ucrt-x86_64-diffutils ^
++        mingw-w64-ucrt-x86_64-gperf ^
++        mingw-w64-ucrt-x86_64-nasm ^
++        mingw-w64-ucrt-x86_64-pkgconf
+ """, 'ThirdParty')
+ 
+ stage('python', """
+@@ -545,7 +548,7 @@ stage('lzma', """
+ win:
+     git clone https://github.com/desktop-app/lzma.git
+     cd lzma\\C\\Util\\LzmaLib
+-    SET "ToolsetProp="
++    SET "ToolsetProp=/property:PlatformToolset=v145"
+ winarm:
+     SET "ToolsetProp=/property:PlatformToolset=v145"
+ win:
+@@ -1405,7 +1408,7 @@ depends:patches/breakpad.diff
+ win:
+     SET "PYTHONUTF8=1"
+     SET "FolderPostfix="
+-    SET "ToolsetProp="
++    SET "ToolsetProp=/property:PlatformToolset=v145"
+ win64:
+     SET "FolderPostfix=_x64"
+ winarm:
