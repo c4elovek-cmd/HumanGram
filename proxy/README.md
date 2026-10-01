@@ -102,6 +102,41 @@ HumanGramProxyStop();
 `3` — не передана конфигурация, `4` — конфигурация повреждена,
 `5` — не удалось запустить прокси.
 
+## Вызов из Java (Android)
+
+Android-клиент не может обратиться к C API напрямую: Java связывается с
+нативными методами по схеме JNI и ищет символы с именами вида
+`Java_<пакет>_<класс>_<метод>`. Перечисленные выше функции носят обычные
+C-имена, поэтому JVM их не увидит.
+
+`bridge/jni_android.go` добавляет недостающий слой: функции
+`Java_org_telegram_messenger_HumanGramProxy_native*` переадресуют вызовы
+в тот же C API. Файл собирается только под Android (тег `android`), так что
+Windows-версия не меняется и продолжает использовать C-символы напрямую.
+
+Соответствие методов:
+
+| Метод в Java | Символ | Вызывает |
+|---|---|---|
+| `nativeStart(String)` | `..._nativeStart` | `HumanGramProxyStart` |
+| `nativeAddress()` | `..._nativeAddress` | `HumanGramProxyAddr` |
+| `nativeLastError()` | `..._nativeLastError` | `HumanGramProxyLastError` |
+| `nativeFreeString(String)` | `..._nativeFreeString` | ничего: строку освобождает JVM |
+| `nativeStop()` | `..._nativeStop` | `HumanGramProxyStop` |
+| `nativeIsRunning()` | `..._nativeIsRunning` | `HumanGramProxyIsRunning` |
+| `nativeSessions()` | `..._nativeSessions` | `HumanGramProxySessions` |
+| `nativeVersion()` | `..._nativeVersion` | `HumanGramProxyVersion` |
+| — | `..._nativePort` | `HumanGramProxyPort` (в Java не используется) |
+
+Строки возвращаются как `jstring`, поэтому `nativeFreeString` на стороне
+Java — заглушка: освобождать память вручную не нужно.
+
+> При сборке без этого файла библиотека собирается, APK собирается,
+> приложение запускается — и не работает. В журнале появляется
+> `No implementation found for ...`. Чтобы такое не прошло незамеченным,
+> `build\build-proxy.ps1` проверяет наличие всех JNI-символов в готовой
+> библиотеке и останавливает сборку с внятной ошибкой.
+
 ## Ключи конфигурации
 
 | Ключ | Тип | По умолчанию | Описание |
