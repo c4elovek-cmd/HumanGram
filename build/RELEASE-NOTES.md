@@ -54,3 +54,12 @@ Telegram-клиент со встроенным локальным прокси 
 * Будущий клиент для Windows — производное от Telegram Desktop, GPL-3.0.
 
 Полный текст условий и благодарности — в файле `LICENSE`.
+
+## Контрольные суммы
+
+Для проверки целостности загруженного файла (SHA-256):
+
+```
+534ecd48c9cf0f30c6f9ba7a35f606cc1aa00e49e66cda70ea006dd2875f3af5  HumanGram-Android.apk
+eccc3c506164a63d970fa9e1b2c50baa9d3e0c714236ca0539b96721950d574b  HumanGram-Proxy-Android-ABIs.zip
+```
