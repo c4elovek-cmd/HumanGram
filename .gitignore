@@ -32,6 +32,7 @@ out/
 *.h
 
 # Ключи подписи и локальная конфигурация
+build/local-credentials.ps1
 *.keystore
 *.jks
 keystore.properties
@@ -44,3 +45,4 @@ local.properties
 *.user
 .DS_Store
 Thumbs.db
+
