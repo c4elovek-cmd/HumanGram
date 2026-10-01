@@ -46,18 +46,18 @@ func newBridgeLogger() *slog.Logger {
 // В cgo-мосте удобнее передавать конфигурацию одной строкой, чем
 // описывать структуру на C.
 type bridgeConfig struct {
-	Secret              string            `json:"secret"`
-	Host                string            `json:"host"`
-	Port                int               `json:"port"`
-	Upstream            string            `json:"upstream"`
-	WebSocketURL        string            `json:"websocketUrl"`
+	Secret               string            `json:"secret"`
+	Host                 string            `json:"host"`
+	Port                 int               `json:"port"`
+	Upstream             string            `json:"upstream"`
+	WebSocketURL         string            `json:"websocketUrl"`
 	WebSocketSubprotocol string            `json:"websocketSubprotocol"`
-	InsecureSkipVerify  bool              `json:"insecureSkipVerify"`
-	DCOverrides         map[string]string `json:"dcOverrides"`
-	IPv6Only            bool              `json:"ipv6Only"`
-	HandshakeTimeoutMs  int               `json:"handshakeTimeoutMs"`
-	IdleTimeoutMs       int               `json:"idleTimeoutMs"`
-	Debug               bool              `json:"debug"`
+	InsecureSkipVerify   bool              `json:"insecureSkipVerify"`
+	DCOverrides          map[string]string `json:"dcOverrides"`
+	IPv6Only             bool              `json:"ipv6Only"`
+	HandshakeTimeoutMs   int               `json:"handshakeTimeoutMs"`
+	IdleTimeoutMs        int               `json:"idleTimeoutMs"`
+	Debug                bool              `json:"debug"`
 }
 
 var (

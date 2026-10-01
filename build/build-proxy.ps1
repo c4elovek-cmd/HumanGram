@@ -45,6 +45,43 @@ $AndroidAbis = @(
     }
 )
 
+# Проверка наличия JNI-символов в собранной библиотеке Android.
+#
+# Зачем: Go в режиме c-shared экспортирует обычные C-символы, а Java
+# связывается с нативными методами по схеме JNI. Символы вида
+# Java_org_telegram_messenger_HumanGramProxy_nativeStart появляются
+# только если bridge/jni_android.go попал в сборку (он ограничен
+# тегом android). Если по какой-то причине файл не включится —
+# например, из-за неверного тега или новой платформы, — библиотека
+# соберётся, APK соберётся, приложение запустится и тихо не будет
+# работать: в журнале появится "No implementation found for ...".
+#
+# Такой отказ уже случался: библиотека была собрана без JNI-моста,
+# и ошибка обнаружилась только при запуске на телефоне. Поэтому
+# проверка встроена в сборку и останавливает её сразу.
+function Assert-JniSymbols {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $expected = @(
+        'nativeStart', 'nativeAddress', 'nativeLastError',
+        'nativeFreeString', 'nativeStop', 'nativeIsRunning',
+        'nativeSessions', 'nativeVersion'
+    )
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    $text = [System.Text.Encoding]::ASCII.GetString($bytes)
+
+    $missing = @(
+        foreach ($name in $expected) {
+            if ($text -notmatch [regex]::Escape("HumanGramProxy_$name")) { $name }
+        }
+    )
+    if ($missing.Count -gt 0) {
+        throw ("В {0} нет JNI-символов: {1}. Библиотека собрана без " +
+            "bridge\jni_android.go — приложение запустится, но прокси " +
+            "не поднимется.") -f (Split-Path $Path -Leaf), ($missing -join ', ')
+    }
+}
+
 function Write-Step($msg) {
     Write-Host ''
     Write-Host "==> $msg" -ForegroundColor Cyan
@@ -168,6 +205,7 @@ try {
         foreach ($abi in $AndroidAbis) {
             $src = Join-Path $out "android\$abi\libhumangramproxy.so"
             if (Test-Path $src) {
+                Assert-JniSymbols -Path $src
                 $dst = Join-Path $jniRoot "$abi\libhumangramproxy.so"
                 New-Item -ItemType Directory -Force -Path (Split-Path $dst -Parent) | Out-Null
                 Copy-Item $src $dst -Force

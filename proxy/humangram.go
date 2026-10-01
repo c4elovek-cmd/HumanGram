@@ -161,8 +161,8 @@ func Start(ctx context.Context, cfg Config) (*Proxy, error) {
 	}
 
 	upstream := &transport.Upstream{
-		Resolver:             resolver,
-		HandshakeTimeout:     cfg.HandshakeTimeout,
+		Resolver:              resolver,
+		HandshakeTimeout:      cfg.HandshakeTimeout,
 		TLSInsecureSkipVerify: cfg.InsecureSkipVerify,
 	}
 	if cfg.Upstream == UpstreamWebSocket {
@@ -171,9 +171,9 @@ func Start(ctx context.Context, cfg Config) (*Proxy, error) {
 		}
 		tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: cfg.InsecureSkipVerify}
 		upstream.WS = &transport.WSConfig{
-			URL:             cfg.WebSocketURL,
-			Subprotocol:     cfg.WebSocketSubprotocol,
-			TLSConfig:       tlsCfg,
+			URL:              cfg.WebSocketURL,
+			Subprotocol:      cfg.WebSocketSubprotocol,
+			TLSConfig:        tlsCfg,
 			HandshakeTimeout: cfg.HandshakeTimeout,
 		}
 	} else if cfg.Upstream != UpstreamDirect {

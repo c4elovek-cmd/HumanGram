@@ -472,4 +472,3 @@ func TestProxyStopIsIdempotent(t *testing.T) {
 		t.Fatalf("повторная остановка: %v", err)
 	}
 }
-
