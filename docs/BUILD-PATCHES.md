@@ -300,6 +300,68 @@ dotsrc — везде 404; максимальная доступная верс�
 **Статус.** Решение за пользователем сборки; остальные зависимости от
 сети устранены.
 
+## 9. Идентификатор приложения Android
+
+**Причина.** Приложение, собранное с исходным идентификатором
+`org.telegram.messenger`, не устанавливается рядом с официальным
+Telegram: Android допускает одно приложение на пакет. Кроме того, из-за
+чужой подписи официальный клиент не может обновить такую сборку, а она
+не может быть обновлена им, то есть каждое обновление Telegram
+потребовало бы удаления и переустановки.
+
+**Изменение.** Идентификатор заменён на `com.humangram.messenger`.
+Изменены все места, где зашит именно идентификатор приложения:
+
+| Файл | Что изменено |
+|---|---|
+| `gradle.properties` | `APP_PACKAGE` |
+| `TMessagesProj/src/main/res/xml/auth.xml` | `android:accountType` |
+| `TMessagesProj/src/main/res/xml/sync_contacts.xml` | `android:accountType` |
+| `TMessagesProj/src/main/res/xml/auth_menu.xml` | `android:targetPackage`, действие `OPEN_ACCOUNT` |
+| `TMessagesProj/src/main/res/xml/shortcuts.xml` | категория ярлыков `SHORTCUT_SHARE` |
+| `TMessagesProj/src/main/AndroidManifest.xml` | действия `CREATE_STICKER_PACK`, `ACTION_COPY_CODE`, `ACTION_MESSAGE_HEARD` |
+| `TMessagesProj/src/main/java/.../MediaDataController.java` | `SHORTCUT_CATEGORY` |
+| `TMessagesProj/src/main/java/.../BuildVars.java` | проверка beta-сборки, ссылка на магазин |
+| `TMessagesProj/src/main/java/.../ContactsController.java` | тип системной учётной записи |
+| `TMessagesProj/src/main/java/.../NotificationsController.java` | действия `ACTION_COPY_CODE`, `ACTION_MESSAGE_HEARD` |
+| `TMessagesProj/src/main/java/.../MessagesController.java` | ссылка на управление подпиской |
+| `TMessagesProj/src/main/java/.../ApplicationLoader.java` | путь к приватному хранилищу |
+| `TMessagesProj/src/main/java/org/telegram/ui/LaunchActivity.java` | обработка `CREATE_STICKER_PACK`, `OPEN_ACCOUNT` |
+| `TMessagesProj/src/main/java/.../Premium/PremiumNotAvailableBottomSheet.java` | ссылка на магазин |
+
+**Что намеренно не изменено:**
+
+* `namespace 'org.telegram.messenger'` в сборочных файлах — это
+  Java-пространство имён, оно обязано совпадать с пакетом исходников;
+* объявления `package org.telegram.messenger;` и импорты — структура
+  исходного кода;
+* `android:targetClass="org.telegram.ui.LaunchActivity"` — имя класса;
+* действия `org.telegram.start`, `org.telegram.passport.AUTHORIZE`,
+  `org.telegram.android.musicplayer.*` — публичные протоколы
+  (`tg://`-ссылки), их смена сломала бы совместимость;
+* MIME-типы `vnd.org.telegram.messenger.*` — контракт с поставщиком
+  контактов, к идентификатору приложения не относится.
+
+**Отдельно про путь к данным.** Прежний код жёстко указывал
+`/data/data/org.telegram.messenger/files`. После смены пакета такой путь
+перестал бы соответствовать реальному расположению данных. Путь теперь
+берётся из `ApplicationInfo.dataDir`, поэтому расхождение с манифестом
+невозможно; исходное значение оставлено только как запасной вариант.
+
+Ключ подписи при этом менять не требуется: подпись не зависит от
+идентификатора. Сборка с новым пакетом просто начинает историю
+установок заново, что и требуется.
+
+**Нюанс с Google Services.** Плагин `com.google.gms.google-services`
+подключён и к библиотечному модулю `TMessagesProj`. У этого модуля нет
+`applicationId` — только `namespace 'org.telegram.messenger'`, — поэтому
+плагин сверяет клиента именно с `namespace`. Файл
+`TMessagesProj/google-services.json` поэтому оставлен без изменений, а
+новые имена прописаны только в файлах модулей приложения
+(`TMessagesProj_App` и вариантов). Если заменить его и там, сборка падает
+с ошибкой `No matching client found for package name
+'org.telegram.messenger'`.
+
 ---
 
 ## Credits
