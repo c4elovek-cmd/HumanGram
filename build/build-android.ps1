@@ -83,6 +83,44 @@ if (-not $ApiId -or -not $ApiHash) {
     throw 'Не заданы ApiId и ApiHash. Укажите их параметрами или переменными TELEGRAM_API_ID и TELEGRAM_API_HASH.'
 }
 
+Write-Step 'Окончания строк в файлах тем'
+
+# Файлы .attheme должны попадать в сборку с LF, а не с CRLF.
+#
+# Почему это важно. Разбор темы в Telegram делит файл только по символу
+# '\n', а остаток строки целиком передаёт в разбор числа. При окончаниях
+# CRLF символ '\r' становится частью значения:
+#
+#   windowBackgroundWhite=-14866637\r   ->  -148666335
+#   windowBackgroundWhiteBlackText=-1\r ->  25
+#
+# Цвета получаются мусорными, и тёмная тема отрисовывается чёрной без
+# надписей. Источник проблемы — core.autocrlf в репозитории клиента:
+# git переписывает окончания строк при клонировании на Windows.
+#
+# Файл android\.gitattributes защищает от повторения при клонировании,
+# а эта проверка закрывает случай, когда правки внесены в обход git или
+# файлы распакованы из архива.
+$themeAssets = Join-Path $android 'TMessagesProj\src\main\assets'
+$normalized = 0
+foreach ($file in (Get-ChildItem $themeAssets -Filter '*.attheme' -ErrorAction SilentlyContinue)) {
+    $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
+    $hasCrlf = $false
+    for ($i = 1; $i -lt $bytes.Length; $i++) {
+        if ($bytes[$i] -eq 10 -and $bytes[$i - 1] -eq 13) { $hasCrlf = $true; break }
+    }
+    if (-not $hasCrlf) { continue }
+    $text = [System.Text.Encoding]::UTF8.GetString($bytes) -replace "`r`n", "`n"
+    [System.IO.File]::WriteAllText($file.FullName, $text, (New-Object System.Text.UTF8Encoding($false)))
+    $normalized++
+    Write-Host ("    {0}: CRLF -> LF" -f $file.Name) -ForegroundColor Yellow
+}
+if ($normalized -eq 0) {
+    Write-Host '    все файлы тем уже в LF'
+} else {
+    Write-Host ("    исправлено файлов: {0}" -f $normalized) -ForegroundColor Yellow
+}
+
 Write-Step 'Ключ подписи'
 
 $keystore = Join-Path $android 'TMessagesProj\config\release.keystore'
