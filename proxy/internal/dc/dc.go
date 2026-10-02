@@ -34,6 +34,57 @@ var builtIn = map[int][]Endpoint{
 	5: {{IP: "149.154.171.5", Port: 443}},
 }
 
+// wsPath — путь WebSocket-эндпоинта Telegram.
+//
+// Тот же путь используется во всех доменах web.telegram.org.
+const wsPath = "/apiwss"
+
+// wsDomains сопоставляет номер дата-центра домену Telegram, который
+// обслуживает WebSocket-соединения этого центра.
+//
+// Зачем нужны домены, а не адреса из builtIn. Прямое TCP-соединение к
+// адресам дата-центров во многих сетях недоступно: блокировка строится по
+// адресам. Соединение по домену Telegram с тем же адресом назначения
+// выглядит для фильтра обычным TLS-обменом с сайтом и проходит.
+//
+// Именно так работает Flowseal/tg-ws-proxy: он извлекает номер центра из
+// обфускационного init-пакета клиента и открывает WebSocket к домену
+// соответствующего центра. Сторонние серверы при этом не нужны.
+var wsDomains = map[int]string{
+	1: "zeta.web.telegram.org",
+	2: "pluto.web.telegram.org",
+	3: "venus.web.telegram.org",
+	4: "aurora.web.telegram.org",
+	5: "flora.web.telegram.org",
+}
+
+// WebSocketURL возвращает адрес WebSocket-эндпоинта для указанного
+// дата-центра.
+//
+// Номер центра берётся из init-пакета клиента, поэтому прокси не требует
+// ни настройки, ни стороннего узла: адрес выводится из самого трафика.
+func WebSocketURL(dcID int) (string, error) {
+	domain, ok := wsDomains[dcID]
+	if !ok {
+		return "", fmt.Errorf("нет WebSocket-домена для дата-центра %d", dcID)
+	}
+	return "wss://" + domain + wsPath, nil
+}
+
+// KnownWebSocketDC перечисляет номера центров с известным WebSocket-доменом.
+func KnownWebSocketDC() []int {
+	out := make([]int, 0, len(wsDomains))
+	for id := range wsDomains {
+		out = append(out, id)
+	}
+	for i := 1; i < len(out); i++ {
+		for j := i; j > 0 && out[j] < out[j-1]; j-- {
+			out[j], out[j-1] = out[j-1], out[j]
+		}
+	}
+	return out
+}
+
 // builtInIPv6 содержит адреса основного кластера в формате IPv6.
 var builtInIPv6 = map[int][]Endpoint{
 	1: {{IP: "2001:0b28:f23d:f001::a", Port: 443}},

@@ -71,7 +71,7 @@ func (u *Upstream) Dial(ctx context.Context, dcID int, dcIndex int16, tag [4]byt
 
 	var lastErr error
 	for _, ep := range endpoints {
-		conn, err := u.dialEndpoint(ctx, ep, timeout)
+		conn, err := u.dialEndpointFor(ctx, ep, dcID, timeout)
 		if err != nil {
 			lastErr = err
 			continue
@@ -93,6 +93,14 @@ func (u *Upstream) Dial(ctx context.Context, dcID int, dcIndex int16, tag [4]byt
 }
 
 func (u *Upstream) dialEndpoint(ctx context.Context, ep dc.Endpoint, timeout time.Duration) (net.Conn, error) {
+	return u.dialEndpointFor(ctx, ep, 0, timeout)
+}
+
+// dialEndpointFor устанавливает соединение с адресом ep. Параметр dcID
+// используется только при WebSocket-транспорте: по нему выбирается домен
+// Telegram соответствующего дата-центра. Значение 0 означает, что домен
+// не задан и используется адрес из конфигурации.
+func (u *Upstream) dialEndpointFor(ctx context.Context, ep dc.Endpoint, dcID int, timeout time.Duration) (net.Conn, error) {
 	if u.WS == nil {
 		dialer := u.Dialer
 		if dialer == nil {
@@ -119,5 +127,14 @@ func (u *Upstream) dialEndpoint(ctx context.Context, ep dc.Endpoint, timeout tim
 	// виртуального узла: соединение устанавливается с настроенного
 	// WebSocket-эндпоинта, а идентификатор дата-центра передаётся
 	// в префиксе обфускации.
+	//
+	// Если эндпоинт не задан в конфигурации, берётся домен Telegram того
+	// дата-центра, к которому обратился клиент. Номер центра известен из
+	// init-пакета, поэтому сторонний узел не требуется.
+	if cfg.URL == "" && dcID > 0 {
+		if url, err := dc.WebSocketURL(dcID); err == nil {
+			cfg.URL = url
+		}
+	}
 	return DialWS(ctx, cfg)
 }

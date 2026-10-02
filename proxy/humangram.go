@@ -39,6 +39,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strings"
 	"time"
 
@@ -166,8 +167,14 @@ func Start(ctx context.Context, cfg Config) (*Proxy, error) {
 		TLSInsecureSkipVerify: cfg.InsecureSkipVerify,
 	}
 	if cfg.Upstream == UpstreamWebSocket {
-		if cfg.WebSocketURL == "" {
-			return nil, errors.New("humangram: для WebSocket-транспорта требуется WebSocketURL")
+		// Адрес WebSocket-эндпоинта задавать не требуется: номер
+		// дата-центра известен из init-пакета клиента, а домен
+		// соответствующего центра подставляется автоматически. Пустая
+		// строка означает «использовать домен Telegram».
+		if cfg.WebSocketURL != "" && cfg.Upstream == UpstreamWebSocket {
+			if _, err := url.Parse(cfg.WebSocketURL); err != nil {
+				return nil, fmt.Errorf("humangram: неверный адрес WebSocket: %w", err)
+			}
 		}
 		tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: cfg.InsecureSkipVerify}
 		upstream.WS = &transport.WSConfig{
